@@ -1,0 +1,9 @@
+/bin/*
+/obj/*
+/.vs/
+/FileWatchPentahoServiceRun/bin/
+/FileWatcherPentahoServiceRun/obj/Debug/
+/FileWatchPentahoServiceRun/obj/
+/packages/
+/PentahoRunOnFileChangeService/bin/
+/PentahoRunOnFileChangeService/obj/
