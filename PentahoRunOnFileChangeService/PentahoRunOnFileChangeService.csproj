@@ -48,6 +48,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\FolderAndCommand.cs">
+      <Link>FolderAndCommand.cs</Link>
+    </Compile>
     <Compile Include="..\Logger.cs">
       <Link>Logger.cs</Link>
     </Compile>

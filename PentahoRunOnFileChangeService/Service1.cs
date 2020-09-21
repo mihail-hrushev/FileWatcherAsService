@@ -22,7 +22,6 @@ namespace PentahoRunOnFileChangeService
         public Service1()
         {
             InitializeComponent();
-            
         }
 
         protected override void OnStart(string[] args)
@@ -35,7 +34,7 @@ namespace PentahoRunOnFileChangeService
 
             this._logger.WriteToFile("Service is started at " + DateTime.Now);
             timer.Elapsed += new ElapsedEventHandler(OnElapsedTime);
-            timer.Interval = 20000; //number in milisecinds  
+            timer.Interval = 300000; //number in milisecinds  
             timer.Enabled = true;
         }
 

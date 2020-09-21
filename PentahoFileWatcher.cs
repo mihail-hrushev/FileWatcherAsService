@@ -2,35 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Newton =  Newtonsoft.Json; 
+
 
 namespace FileWatcherPentahoRun
 {
-
-    public class FolderAndCommand: IEquatable<FolderAndCommand>
-    {
-        public string folderName;
-        public string commandPath; 
-
-        public FolderAndCommand( string folder, string command)
-        {
-            folderName = folder;
-            commandPath = command; 
-        }
-
-        public bool Equals(FolderAndCommand other)
-        {
-            if ((this.folderName == other.folderName) && (this.commandPath == other.commandPath))
-            {
-                return true;
-            } else {
-                return false;
-            }
-        }
-    }
 
     class PentahoFileWatcher
     {
@@ -39,25 +14,36 @@ namespace FileWatcherPentahoRun
         private System.Timers.Timer timer;
         
         private bool isReadyForNewTaskExecute = true;
-        private bool rerunafter = false;
 
         private List<FileSystemWatcher> myWatch;
         private List<FolderAndCommand> executionQueue; 
         private List<FolderAndCommand> _itemList;
 
+        private ILogger _logger;
+
+        public PentahoFileWatcher setLogger(ILogger logger)
+        {
+            this._logger = logger;
+            return this;
+        }
+
         #endregion
 
-    #region EVENTS 
+     #region EVENTS 
         //If app already doing something, then add item to queue, else, add it to queue, execute and lau
         public void RunCommandEvent(object sender, EventArgs e, FolderAndCommand comm)
         {
             //if task already exist in queue - return
+            this._logger.WriteToFile($"Try to add event in execution queue - {comm.folderName}");
             if (this.executionQueue.Contains(comm)) return;
+
             //if not - add to queu
+            this._logger.WriteToFile($"Add to excution queue new Item - {comm.folderName}");
             this.executionQueue.Add(comm);
             //if queue already executer - return
             if (!isReadyForNewTaskExecute) return;
             //start queu execution. 
+            this._logger.WriteToFile($"Run task -  {comm.folderName}");
             RunNextTaskFromQueue();
         }
 
@@ -91,9 +77,9 @@ namespace FileWatcherPentahoRun
             // Specify what is done when a file is renamed.
             Console.WriteLine("File: {0} renamed to {1}", e.OldFullPath, e.FullPath);
         }
-        #endregion
+     #endregion
         
-    #region CONST
+    #region CONSTRUCTOR
 
         public PentahoFileWatcher()
         {
@@ -102,11 +88,10 @@ namespace FileWatcherPentahoRun
             executionQueue = new List<FolderAndCommand>();
             timer = new System.Timers.Timer();
             timer.Elapsed += new System.Timers.ElapsedEventHandler(OnTimedEvent);
-            //timer.Interval = 140000;
             timer.Interval = 140000;
         }
 
-        #endregion
+    #endregion
 
     #region Public 
 
@@ -125,32 +110,8 @@ namespace FileWatcherPentahoRun
 
             return true;
         }
-        
-        public void LoadItems(string filePath)
-        {
-            string json = File.ReadAllText(filePath);
-            _itemList = Newton.JsonConvert.DeserializeObject<List<FolderAndCommand>>(json);
 
-            _itemList.ForEach(item =>
-           { if (item.commandPath!=null && item.commandPath!="" &&item.folderName!=null&& item.folderName!="")
-               CreateFileWatcher(item);
-           });
-        }
-        
-        public void SaveItems(string filePath)
-        {
-            File.WriteAllText(filePath, Newton.JsonConvert.SerializeObject(_itemList));
-        }
-
-        #endregion
-
-        private ILogger _logger; 
-
-        public PentahoFileWatcher setLogger(ILogger logger)
-        {
-            this._logger = logger;
-            return this; 
-        }
+    #endregion
 
         private void CreateFileWatcher(FolderAndCommand foldComm)
         {
@@ -182,6 +143,16 @@ namespace FileWatcherPentahoRun
             this.myWatch.Add(watcher);
         }
 
+        public void LoadItems(string path)
+        {
+            this._itemList = FolderAndCommand.LoadItems(path);
+        }
+
+        public void SaveItems(string path)
+        {
+            FolderAndCommand.SaveItems(path, this._itemList);
+        }
+
         private void RunScript(string processFileName)
         {
             try
@@ -198,8 +169,6 @@ namespace FileWatcherPentahoRun
                     WindowStyle = ProcessWindowStyle.Hidden
                 };
 
-                //startInfo.EnvironmentVariables.Add("CATALINA_HOME", @"c:\server");
-
                 var process = new Process();
                 process.StartInfo = startInfo;
                 process.Start();
@@ -210,36 +179,10 @@ namespace FileWatcherPentahoRun
             }
         }
 
-
         private void ExecuteCommand(FolderAndCommand command)
         {
             this._logger.WriteToFile( $" ExecuteCommand: {command.commandPath} ");
-
             this.RunScript(command.commandPath);
-
-            //System.Diagnostics.Process.Start(command.commandPath);
-
-            //var processInfo = new ProcessStartInfo("cmd.exe", "/c " + command);
-            //processInfo.CreateNoWindow = true;
-            //processInfo.UseShellExecute = false;
-            //processInfo.RedirectStandardError = true;
-            //processInfo.RedirectStandardOutput = true;
-
-            //var process = Process.Start(processInfo);
-
-            //process.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
-            //    Console.WriteLine("output>>" + e.Data);
-            //process.BeginOutputReadLine();
-
-            //process.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
-            //    Console.WriteLine("error>>" + e.Data);
-            //process.BeginErrorReadLine();
-
-            //process.WaitForExit();
-
-            //Console.WriteLine("ExitCode: {0}", process.ExitCode);
-            //process.Close();
         }
-
     }
 }
