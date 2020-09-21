@@ -20,7 +20,8 @@ namespace FileWatcherPentahoRun
 
         public Logger(string path)
         {
-            this.path = path; 
+            this.path = path;
+            WriteToFile(path);
         }
 
         public void WriteToFile(string Message)
@@ -36,14 +37,14 @@ namespace FileWatcherPentahoRun
                 // Create a file to write to.   
                 using (StreamWriter sw = File.CreateText(filepath))
                 {
-                    sw.WriteLine(Message);
+                    sw.WriteLine(DateTime.Now+ ": " + Message);
                 }
             }
             else
             {
                 using (StreamWriter sw = File.AppendText(filepath))
                 {
-                    sw.WriteLine(Message);
+                    sw.WriteLine(DateTime.Now + ": "+Message);
                 }
             }
         }

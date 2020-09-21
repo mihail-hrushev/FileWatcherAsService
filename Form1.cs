@@ -23,8 +23,7 @@ namespace FileWatcherPentahoRun
         public Form1()
         {
             InitializeComponent();
-            this.pentaho = new PentahoFileWatcher(); 
-
+            this.pentaho = new PentahoFileWatcher(@"C:\_DEV\C#\FileWatcherPentahoRunGit\PentahoRunOnFileChangeService\bin\Debug\Command.json", 20000); 
         }
 
         
@@ -175,8 +174,7 @@ namespace FileWatcherPentahoRun
 
             this._logger = new Logger(AppDomain.CurrentDomain.BaseDirectory);
             this.pentaho.setLogger(this._logger);
-            this.pentaho.LoadItems(@"C:\_Dev\Command.json");
-            
+            this.pentaho.LoadItems();
         }
     }
 }

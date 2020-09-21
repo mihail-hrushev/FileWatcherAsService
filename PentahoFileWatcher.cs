@@ -7,6 +7,68 @@ using System.IO;
 namespace FileWatcherPentahoRun
 {
 
+    class myFileSystemWatcher : IDisposable
+    {
+        private FileSystemWatcher watcher;
+        private FileSystemEventHandler eventhandler;
+        private FolderAndCommand fold;
+        public Action eventAction { get; set; }
+
+        public myFileSystemWatcher(FileSystemWatcher w, FolderAndCommand fold)
+        {
+            this.watcher = w;
+            this.fold = fold;
+            timer = new System.Timers.Timer();
+            timerHandler = new System.Timers.ElapsedEventHandler(OnTimedEvent);
+            timer.Elapsed += timerHandler;
+        }
+
+        public myFileSystemWatcher setEvent(FileSystemEventHandler e)
+        {
+            this.eventhandler = e;
+            StartWatch();
+            return this;
+        }
+
+        public void Stopwatch()
+        {
+            watcher.Changed -= eventhandler;
+        }
+
+        public void StartWatch()
+        {
+            watcher.Changed += eventhandler;
+        }
+
+
+        private System.Timers.Timer timer;
+        private System.Timers.ElapsedEventHandler timerHandler; 
+
+        public void PospondeToAvoidUnreasonableEventsCalls(double delay = 1000)
+        {
+            Stopwatch();
+            timer.Interval = delay;
+            timer.Start();
+        }
+
+        private void OnTimedEvent(Object source, EventArgs e)
+        {
+            timer.Stop();
+            timer.Enabled = false;
+            StartWatch();
+        }
+
+        public void Dispose()
+        {
+            watcher.Changed -= eventhandler;
+            eventhandler = null;
+            watcher.EnableRaisingEvents = false;
+            watcher.Dispose();
+            watcher = null;
+        }
+
+    }
+
     class PentahoFileWatcher
     {
         
@@ -15,7 +77,7 @@ namespace FileWatcherPentahoRun
         
         private bool isReadyForNewTaskExecute = true;
 
-        private List<FileSystemWatcher> myWatch;
+        private List<myFileSystemWatcher> myWatch;
         private List<FolderAndCommand> executionQueue; 
         private List<FolderAndCommand> _itemList;
 
@@ -27,11 +89,14 @@ namespace FileWatcherPentahoRun
             return this;
         }
 
+        private string _itemListPath; 
+
+
         #endregion
 
      #region EVENTS 
         //If app already doing something, then add item to queue, else, add it to queue, execute and lau
-        public void RunCommandEvent(object sender, EventArgs e, FolderAndCommand comm)
+        public void RunCommandEvent(object sender, EventArgs e, myFileSystemWatcher watcher, FolderAndCommand comm)
         {
             //if task already exist in queue - return
             this._logger.WriteToFile($"Try to add event in execution queue - {comm.folderName}");
@@ -40,6 +105,7 @@ namespace FileWatcherPentahoRun
             //if not - add to queu
             this._logger.WriteToFile($"Add to excution queue new Item - {comm.folderName}");
             this.executionQueue.Add(comm);
+            watcher.PospondeToAvoidUnreasonableEventsCalls();
             //if queue already executer - return
             if (!isReadyForNewTaskExecute) return;
             //start queu execution. 
@@ -61,15 +127,13 @@ namespace FileWatcherPentahoRun
         private void RunNextTaskFromQueue () {
             isReadyForNewTaskExecute = true;
             //if something in queue - reset timer, execute command.
-            if (executionQueue.Count > 0)
-            {
-                isReadyForNewTaskExecute = false;
-                timer.Enabled = true;
-                timer.Start();
-                this.ExecuteCommand(executionQueue[0]);
-                executionQueue.RemoveAt(0);
-                return; 
-            }
+            if (executionQueue.Count == 0) return;
+
+            isReadyForNewTaskExecute = false;
+            timer.Enabled = true;
+            timer.Start();
+            this.ExecuteCommand(executionQueue[0]);
+            executionQueue.RemoveAt(0);
         }
 
         private static void OnRenamed(object source, RenamedEventArgs e)
@@ -81,14 +145,16 @@ namespace FileWatcherPentahoRun
         
     #region CONSTRUCTOR
 
-        public PentahoFileWatcher()
+        public PentahoFileWatcher(string _itemListPath, double delay)
         {
-            myWatch = new List<FileSystemWatcher>();
+            this._itemListPath = _itemListPath; 
+            myWatch = new List<myFileSystemWatcher>();
             _itemList = new List<FolderAndCommand>();
             executionQueue = new List<FolderAndCommand>();
             timer = new System.Timers.Timer();
             timer.Elapsed += new System.Timers.ElapsedEventHandler(OnTimedEvent);
-            timer.Interval = 140000;
+            timer.Interval = delay;
+            ListFileWatch(); 
         }
 
     #endregion
@@ -111,7 +177,22 @@ namespace FileWatcherPentahoRun
             return true;
         }
 
-    #endregion
+        #endregion
+
+        private void ListFileWatch ()
+            {
+                FileSystemWatcher Watcher = new FileSystemWatcher();
+                Watcher.Path = Path.GetDirectoryName(this._itemListPath);
+                Watcher.Filter = "Command.json";
+                Watcher.NotifyFilter = NotifyFilters.LastWrite;
+                Watcher.Changed += new FileSystemEventHandler(OnChanged);
+                Watcher.EnableRaisingEvents = true;
+            }
+
+        private void OnChanged(object source, FileSystemEventArgs e)
+        {
+            this.LoadItems();
+        }
 
         private void CreateFileWatcher(FolderAndCommand foldComm)
         {
@@ -128,11 +209,13 @@ namespace FileWatcherPentahoRun
             // Only watch text files.
 
             var filterExt = "*" + Path.GetExtension(foldComm.folderName);
-
+            //var filterExt = "*.xls";
             watcher.Filter = filterExt;
 
-            // Add event handlers.
-            watcher.Changed += new FileSystemEventHandler((sender, e) => RunCommandEvent(sender, e, foldComm));
+
+
+
+
             //watcher.Changed += new FileSystemEventHandler(this.OnChanged);
             //watcher.Created += new FileSystemEventHandler(this.OnChanged);
             //watcher.Deleted += new FileSystemEventHandler(this.OnChanged);
@@ -140,12 +223,38 @@ namespace FileWatcherPentahoRun
 
             // Begin watching.
             watcher.EnableRaisingEvents = true;
-            this.myWatch.Add(watcher);
+            
+
+            var m = new myFileSystemWatcher(watcher, foldComm);
+            var ev = new FileSystemEventHandler((sender, e) => RunCommandEvent(sender, e, m, foldComm));
+            m.setEvent(ev);
+            
+
+            this.myWatch.Add(m);
         }
 
-        public void LoadItems(string path)
+        public void LoadItems()
         {
-            this._itemList = FolderAndCommand.LoadItems(path);
+            try
+            {
+                this._itemList = FolderAndCommand.LoadItems(this._itemListPath);
+            } catch (Exception e )
+            {
+                this._logger.WriteToFile(e.Message);
+                return;
+            }
+
+            this.myWatch.ForEach(i =>
+            {
+                i.Dispose(); 
+            });
+            this.myWatch.Clear();
+            
+            this._itemList.ForEach(i =>
+            {
+                this.CreateFileWatcher(i);
+            });
+
         }
 
         public void SaveItems(string path)

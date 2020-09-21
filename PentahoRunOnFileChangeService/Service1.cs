@@ -28,9 +28,9 @@ namespace PentahoRunOnFileChangeService
         {
             var path = AppDomain.CurrentDomain.BaseDirectory;
             this._logger = new Logger(path);
-            pentaho = new PentahoFileWatcher()
+            pentaho = new PentahoFileWatcher(path, 300000)
                             .setLogger(this._logger);
-            pentaho.LoadItems(path+@"\Command.json");
+            pentaho.LoadItems();
 
             this._logger.WriteToFile("Service is started at " + DateTime.Now);
             timer.Elapsed += new ElapsedEventHandler(OnElapsedTime);
